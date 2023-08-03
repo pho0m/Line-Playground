@@ -2,7 +2,8 @@
   "name": "functions",
   "description": "Cloud Functions for Firebase",
   "scripts": {
-    "serve": "firebase emulators:start --only functions",
+    "serve": "npm run build -- --watch | firebase emulators:start --only functions",
+    "build": "",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
