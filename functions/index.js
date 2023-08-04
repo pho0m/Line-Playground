@@ -17,24 +17,25 @@ setGlobalOptions({ maxInstances: 10 });
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started
-
+// [1] creating healthcheck
 exports.healthcheck = onRequest((req, res) => {
-  logger.info("Hello logs!", { structuredData: true });
-  res.send("Hello from Firebase! functions");
+  logger.info("Hello logs!", { structuredData: true }); // it's will print to firebase log
+  console.log("Hello console.log"); // it's will print in console with debug
+  res.send("Hello from Firebase! functions"); // it's will show in response
 });
 
+// [2] creating bothooks
 exports.bothooks = onRequest(async (req, res) => {
   try {
     const replyToken = req.body.events[0].replyToken;
     const eventType = req.body.events[0].type;
     const userId = req.body.events[0].source.userId;
-
-    console.log(req.body.events[0]);
+    // console.log(replyToken); // For testing
 
     switch (eventType) {
+      // postback type
       case "postback":
         const postbackData = req.body.events[0].postback.data;
-        console.log(postbackData.toString());
 
         // detect weather functions
         if (postbackData.toString() === "weather") {
@@ -51,7 +52,7 @@ exports.bothooks = onRequest(async (req, res) => {
           return replyWithQuickReplyHoroscope(replyToken);
         }
 
-        // detect call-admin functions
+        // detect call-admin functions send to line notify
         if (postbackData.toString() === "call-admin") {
           const profile = await getLineProfile(userId);
           const profileData = JSON.parse(profile);
@@ -60,28 +61,30 @@ exports.bothooks = onRequest(async (req, res) => {
         }
         break;
 
+      // postback type
       case "message":
-        const messageData = req.body.events[0].message;
-        const type = req.body.events[0].message.type;
-        const textData = req.body.events[0].message.text;
+        const messageData = req.body.events[0].message; // messageData from event all message
+        const type = req.body.events[0].message.type; // messageData from event message only type
+        const textData = req.body.events[0].message.text; // messageData from event message only text
 
+        // detect to call getWeather
         if (type.toString() === "location") {
           return getWeather(replyToken, messageData);
         }
 
+        // detect to call push message
         if (textData.toString() === "เกี่ยวกับ Momo Bot") {
-          return pushMessage(userId, messageData);
+          return pushMessage(userId);
         }
-        break;
 
-      default:
+        // default with chatGPT
         // Type Text Section
         if (req.body.events[0].message.type !== "text") {
           return;
         }
         const text = req.body.events[0].message.text;
 
-        // Gpt functions
+        // Gpt functions use gpt: [your questions]
         const isGpt = text.startsWith("gpt: ");
 
         if (isGpt) {
@@ -91,7 +94,6 @@ exports.bothooks = onRequest(async (req, res) => {
 
           return replyFromChatGPT(replyToken, body);
         }
-
         break;
     }
 
@@ -101,6 +103,7 @@ exports.bothooks = onRequest(async (req, res) => {
   }
 });
 
+//* GPT section
 const senddingToOpenAIChatGPT = async (bodyResponse) => {
   const OPEN_AI_API = process.env.OPEN_AI_API;
   const OPEN_AI_HEADER = {
@@ -130,6 +133,7 @@ const senddingToOpenAIChatGPT = async (bodyResponse) => {
   return res;
 };
 
+//* Line notify section
 const LINE_NOTIFY_API = process.env.LINE_NOTIFY_API;
 const LINE_NOTIFY_HEADER = {
   "Content-Type": "application/x-www-form-urlencoded",
@@ -147,12 +151,14 @@ const replyToNotify = async (userData) => {
   });
 };
 
+//* Line messaging section
 const LINE_MESSAGING_API = process.env.LINE_MESSAGING_API;
 const LINE_HEADER = {
   "Content-Type": "application/json",
   Authorization: `Bearer ${process.env.LINE_HEADER_TOKEN}`,
 };
 
+// get line profile
 const getLineProfile = async (userId) => {
   return await request({
     method: `GET`,
@@ -161,6 +167,7 @@ const getLineProfile = async (userId) => {
   });
 };
 
+// reply from gpt data
 const replyFromChatGPT = (replyToken, text) => {
   return request({
     method: `POST`,
@@ -178,6 +185,7 @@ const replyFromChatGPT = (replyToken, text) => {
   });
 };
 
+// reply to location action
 const replyWeatherSelectLocation = async (replyToken) => {
   return request({
     method: `POST`,
@@ -206,6 +214,8 @@ const replyWeatherSelectLocation = async (replyToken) => {
   });
 };
 
+//* Weather sction
+// get weather api
 const getWeather = async (replyToken, messageData) => {
   const response = await request({
     method: `GET`,
@@ -223,6 +233,7 @@ const getWeather = async (replyToken, messageData) => {
   return await reply(replyToken, message);
 };
 
+// reply message to line
 const reply = async (replyToken, msg) => {
   return request({
     method: `POST`,
@@ -240,7 +251,8 @@ const reply = async (replyToken, msg) => {
   });
 };
 
-const pushMessage = async (userId, msg) => {
+// push flex message
+const pushMessage = async (userId) => {
   return request({
     method: `POST`,
     uri: `${LINE_MESSAGING_API}/push`,
@@ -379,6 +391,7 @@ const pushMessage = async (userId, msg) => {
   });
 };
 
+// quick reply
 const replyWithQuickReply = async (replyToken) => {
   return request({
     method: `POST`,
@@ -462,6 +475,7 @@ const replyWithQuickReply = async (replyToken) => {
   });
 };
 
+// reply with quick reply
 const replyWithQuickReplyHoroscope = async (replyToken) => {
   return request({
     method: `POST`,
