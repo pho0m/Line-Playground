@@ -27,24 +27,36 @@ exports.bothooks = onRequest(async (req, res) => {
   try {
     const replyToken = req.body.events[0].replyToken;
     const eventType = req.body.events[0].type;
+    console.log(req.body.events[0]);
 
     switch (eventType) {
       case "postback":
         const postbackData = req.body.events[0].postback.data;
+        console.log(postbackData.toString());
 
         // detect weather functions
         if (postbackData.toString() === "weather") {
           return replyWeatherSelectLocation(replyToken);
         }
 
-        // detect weather functions
+        // detect quick reply activity functions
         if (postbackData.toString() === "camera") {
           return replyWithQuickReply(replyToken);
         }
 
-        // detect weather functions
+        // detect horoscope functions
         if (postbackData.toString() === "horoscope") {
           return replyWithQuickReplyHoroscope(replyToken);
+        }
+
+        // detect call-admin functions
+        if (postbackData.toString() === "call-admin") {
+          const userId = req.body.events[0].source.userId;
+
+          const profile = await getLineProfile(userId);
+          const profileData = JSON.parse(profile);
+
+          return replyToNotify(profileData);
         }
         break;
 
@@ -113,10 +125,35 @@ const senddingToOpenAIChatGPT = async (bodyResponse) => {
   return res;
 };
 
+const LINE_NOTIFY_API = process.env.LINE_NOTIFY_API;
+const LINE_NOTIFY_HEADER = {
+  "Content-Type": "application/x-www-form-urlencoded",
+  Authorization: `Bearer ${process.env.LINE_NOTIFY_HEADER_TOKEN}`,
+};
+
+const replyToNotify = async (userData) => {
+  const displayName = userData.displayName;
+
+  return request({
+    method: `POST`,
+    uri: LINE_NOTIFY_API,
+    headers: LINE_NOTIFY_HEADER,
+    body: `message=ก๊อกๆ คุณ ${displayName} เรียกค้าบเข้าไปตอบแชทหน่อย`,
+  });
+};
+
 const LINE_MESSAGING_API = process.env.LINE_MESSAGING_API;
 const LINE_HEADER = {
   "Content-Type": "application/json",
   Authorization: `Bearer ${process.env.LINE_HEADER_TOKEN}`,
+};
+
+const getLineProfile = async (userId) => {
+  return await request({
+    method: `GET`,
+    uri: `https://api.line.me/v2/bot/profile/${userId}`,
+    headers: LINE_HEADER,
+  });
 };
 
 const replyFromChatGPT = (replyToken, text) => {
@@ -178,10 +215,10 @@ const getWeather = async (replyToken, messageData) => {
   const message = `รายงาน อุณหภูมิ วันนี้ค้าบ !\nอยู่ที่ ${data.current.temp_c} องศา (° C)
       \n- สถานที่: ${messageData.address}\n\n- จังหวัด: ${data.location.region}\n- อัพเดทล่าสุด: ${data.current.last_updated}`;
 
-  return await reply(replyToken, message);
+  return await replyWithWeather(replyToken, message);
 };
 
-const reply = async (replyToken, msg) => {
+const replyWithWeather = async (replyToken, msg) => {
   return request({
     method: `POST`,
     uri: `${LINE_MESSAGING_API}/reply`,
