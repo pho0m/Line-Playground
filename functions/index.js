@@ -27,6 +27,8 @@ exports.bothooks = onRequest(async (req, res) => {
   try {
     const replyToken = req.body.events[0].replyToken;
     const eventType = req.body.events[0].type;
+    const userId = req.body.events[0].source.userId;
+
     console.log(req.body.events[0]);
 
     switch (eventType) {
@@ -51,11 +53,9 @@ exports.bothooks = onRequest(async (req, res) => {
 
         // detect call-admin functions
         if (postbackData.toString() === "call-admin") {
-          const userId = req.body.events[0].source.userId;
-
           const profile = await getLineProfile(userId);
           const profileData = JSON.parse(profile);
-
+          reply(replyToken, "เรียกให้แล้วนะค้าบ รอสักครู่นะงับ");
           return replyToNotify(profileData);
         }
         break;
@@ -63,9 +63,14 @@ exports.bothooks = onRequest(async (req, res) => {
       case "message":
         const messageData = req.body.events[0].message;
         const type = req.body.events[0].message.type;
+        const textData = req.body.events[0].message.text;
 
         if (type.toString() === "location") {
           return getWeather(replyToken, messageData);
+        }
+
+        if (textData.toString() === "เกี่ยวกับ Momo Bot") {
+          return pushMessage(userId, messageData);
         }
         break;
 
@@ -215,10 +220,10 @@ const getWeather = async (replyToken, messageData) => {
   const message = `รายงาน อุณหภูมิ วันนี้ค้าบ !\nอยู่ที่ ${data.current.temp_c} องศา (° C)
       \n- สถานที่: ${messageData.address}\n\n- จังหวัด: ${data.location.region}\n- อัพเดทล่าสุด: ${data.current.last_updated}`;
 
-  return await replyWithWeather(replyToken, message);
+  return await reply(replyToken, message);
 };
 
-const replyWithWeather = async (replyToken, msg) => {
+const reply = async (replyToken, msg) => {
   return request({
     method: `POST`,
     uri: `${LINE_MESSAGING_API}/reply`,
@@ -229,6 +234,145 @@ const replyWithWeather = async (replyToken, msg) => {
         {
           type: `text`,
           text: msg,
+        },
+      ],
+    }),
+  });
+};
+
+const pushMessage = async (userId, msg) => {
+  return request({
+    method: `POST`,
+    uri: `${LINE_MESSAGING_API}/push`,
+    headers: LINE_HEADER,
+    body: JSON.stringify({
+      to: userId,
+      messages: [
+        {
+          type: "flex",
+          altText: "This is a Flex Message",
+          contents: {
+            // Parse from line bot design here
+            type: "bubble",
+            header: {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "เกี่ยวกับ Momo Bot",
+                  weight: "bold",
+                  size: "sm",
+                  color: "#AAAAAA",
+                  contents: [],
+                },
+              ],
+            },
+            hero: {
+              type: "image",
+              url: "https://media.discordapp.net/attachments/1125648829862137916/1136735522476269628/logo_1.png",
+              size: "full",
+              aspectRatio: "20:13",
+              aspectMode: "fit",
+              action: {
+                type: "uri",
+                label: "Action",
+                uri: "https://linecorp.com/",
+              },
+            },
+            body: {
+              type: "box",
+              layout: "horizontal",
+              spacing: "md",
+              contents: [
+                {
+                  type: "box",
+                  layout: "vertical",
+                  flex: 1,
+                  contents: [
+                    {
+                      type: "image",
+                      url: "https://media.discordapp.net/attachments/1125648829862137916/1135189504391647292/Untitled_design_3.png",
+                      gravity: "bottom",
+                      size: "sm",
+                      aspectRatio: "4:3",
+                      aspectMode: "fit",
+                    },
+                    {
+                      type: "image",
+                      url: "https://media.discordapp.net/attachments/1125648829862137916/1135189197523783721/Untitled_design_2.png",
+                      margin: "md",
+                      size: "sm",
+                      aspectRatio: "4:3",
+                      aspectMode: "fit",
+                    },
+                  ],
+                },
+                {
+                  type: "box",
+                  layout: "vertical",
+                  flex: 2,
+                  contents: [
+                    {
+                      type: "text",
+                      text: "momo คือบอท ตัวอย่าง",
+                      size: "xs",
+                      flex: 1,
+                      gravity: "top",
+                      contents: [],
+                    },
+                    {
+                      type: "separator",
+                    },
+                    {
+                      type: "text",
+                      text: "ในการอบรม Line Playground",
+                      size: "xs",
+                      flex: 2,
+                      gravity: "center",
+                      contents: [],
+                    },
+                    {
+                      type: "separator",
+                    },
+                    {
+                      type: "text",
+                      text: "ในการใช้ feature ต่างๆ",
+                      size: "xs",
+                      flex: 2,
+                      gravity: "center",
+                      contents: [],
+                    },
+                    {
+                      type: "separator",
+                    },
+                    {
+                      type: "text",
+                      text: "บน Line Official Account",
+                      size: "xs",
+                      flex: 1,
+                      gravity: "bottom",
+                      contents: [],
+                    },
+                  ],
+                },
+              ],
+            },
+            footer: {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "button",
+                  action: {
+                    type: "uri",
+                    label: "Website อบรม",
+                    uri: "https://sites.google.com/email.kmutnb.ac.th/lineapis/home",
+                  },
+                },
+              ],
+            },
+          },
         },
       ],
     }),
