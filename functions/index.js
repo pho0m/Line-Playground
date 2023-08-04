@@ -25,22 +25,16 @@ exports.healthcheck = onRequest((req, res) => {
 
 exports.bothooks = onRequest(async (req, res) => {
   try {
-    console.log("req.body");
-    console.log(req.body);
     const replyToken = req.body.events[0].replyToken;
-
     const eventType = req.body.events[0].type;
-
-    console.log(eventType);
 
     switch (eventType) {
       case "postback":
         const postbackData = req.body.events[0].postback.data;
-        console.log(postbackData.toString());
 
         // detect weather functions
         if (postbackData.toString() === "weather") {
-          return getWeather(replyToken);
+          return replyWeatherSelectLocation(replyToken);
         }
 
         // detect weather functions
@@ -52,7 +46,15 @@ exports.bothooks = onRequest(async (req, res) => {
         if (postbackData.toString() === "horoscope") {
           return replyWithQuickReplyHoroscope(replyToken);
         }
+        break;
 
+      case "message":
+        const messageData = req.body.events[0].message;
+        const type = req.body.events[0].message.type;
+
+        if (type.toString() === "location") {
+          return getWeather(replyToken, messageData);
+        }
         break;
 
       default:
@@ -134,19 +136,55 @@ const replyFromChatGPT = (replyToken, text) => {
   });
 };
 
-const getWeather = async (replyToken) => {
+const replyWeatherSelectLocation = async (replyToken) => {
+  return request({
+    method: `POST`,
+    uri: `${LINE_MESSAGING_API}/reply`,
+    headers: LINE_HEADER,
+    body: JSON.stringify({
+      replyToken: replyToken,
+      messages: [
+        {
+          type: `text`,
+          text: "ปักหมุดตำแหน่งปัจจุบันให้หน่อยฮะ",
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                action: {
+                  type: "location",
+                  label: "Location",
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  });
+};
+
+const getWeather = async (replyToken, messageData) => {
+  console.log("==================================");
+  console.log(messageData);
+  console.log("==================================");
+  console.log(messageData.latitude);
+
+  // const msgData = JSON.parse(messageData);
+  // console.log(msgData);
+
   const response = await request({
     method: `GET`,
     headers: {
       "X-RapidAPI-Key": `${process.env.WEATHER_KEY}`,
       "X-RapidAPI-Host": "weatherapi-com.p.rapidapi.com",
     },
-    uri: `https://weatherapi-com.p.rapidapi.com/current.json?q=${process.env.LOCATION_LAT},${process.env.LOCATION_LONG}`,
+    uri: `https://weatherapi-com.p.rapidapi.com/current.json?q=${messageData.latitude},${messageData.longitude}`,
   });
 
   const data = JSON.parse(response);
-  const message = `Report Now!
-      \n- location: KMUTNB\n- region: ${data.location.region}\n- last_updated: ${data.current.last_updated}\n- temp_c: ${data.current.temp_c} (° C)`;
+  const message = `รายงาน อุณหภูมิ วันนี้ค้าบ !\nอยู่ที่ ${data.current.temp_c} องศา (° C)
+      \n- สถานที่: ${messageData.address}\n\n- จังหวัด: ${data.location.region}\n- อัพเดทล่าสุด: ${data.current.last_updated}`;
 
   return await reply(replyToken, message);
 };
