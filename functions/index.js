@@ -25,27 +25,55 @@ exports.healthcheck = onRequest((req, res) => {
 
 exports.bothooks = onRequest(async (req, res) => {
   try {
-    if (req.body.events[0].message.type !== "text") {
-      return;
-    }
-
-    const text = req.body.events[0].message.text;
+    console.log("req.body");
+    console.log(req.body);
     const replyToken = req.body.events[0].replyToken;
 
-    // detect weather functions
-    if (text === "สภาพอากาศวันนี้ที่ มจพ.") {
-      return getWeather(replyToken, text);
-    }
+    const eventType = req.body.events[0].type;
 
-    // Gpt functions
-    const isGpt = text.startsWith("gpt: ");
+    console.log(eventType);
 
-    if (isGpt) {
-      const resFromGPT = await senddingToOpenAIChatGPT(text);
-      const data = JSON.parse(resFromGPT);
-      const body = data.choices[0].message.content;
+    switch (eventType) {
+      case "postback":
+        const postbackData = req.body.events[0].postback.data;
+        console.log(postbackData.toString());
 
-      return replyFromChatGPT(replyToken, body);
+        // detect weather functions
+        if (postbackData.toString() === "weather") {
+          return getWeather(replyToken);
+        }
+
+        // detect weather functions
+        if (postbackData.toString() === "camera") {
+          return replyWithQuickReply(replyToken);
+        }
+
+        // detect weather functions
+        if (postbackData.toString() === "horoscope") {
+          return replyWithQuickReplyHoroscope(replyToken);
+        }
+
+        break;
+
+      default:
+        // Type Text Section
+        if (req.body.events[0].message.type !== "text") {
+          return;
+        }
+        const text = req.body.events[0].message.text;
+
+        // Gpt functions
+        const isGpt = text.startsWith("gpt: ");
+
+        if (isGpt) {
+          const resFromGPT = await senddingToOpenAIChatGPT(text);
+          const data = JSON.parse(resFromGPT);
+          const body = data.choices[0].message.content;
+
+          return replyFromChatGPT(replyToken, body);
+        }
+
+        break;
     }
 
     return res.send("ok").status(200);
@@ -115,6 +143,7 @@ const getWeather = async (replyToken) => {
     },
     uri: `https://weatherapi-com.p.rapidapi.com/current.json?q=${process.env.LOCATION_LAT},${process.env.LOCATION_LONG}`,
   });
+
   const data = JSON.parse(response);
   const message = `Report Now!
       \n- location: KMUTNB\n- region: ${data.location.region}\n- last_updated: ${data.current.last_updated}\n- temp_c: ${data.current.temp_c} (° C)`;
@@ -139,60 +168,136 @@ const reply = async (replyToken, msg) => {
   });
 };
 
-// exports.LineBot = onRequest((req, res) => {
-//   if (req.body.events[0].message.type !== "text") {
-//     return;
-//   }
-//   reply(req.body);
-// });
+const replyWithQuickReply = async (replyToken) => {
+  return request({
+    method: `POST`,
+    uri: `${LINE_MESSAGING_API}/reply`,
+    headers: LINE_HEADER,
+    body: JSON.stringify({
+      replyToken: replyToken,
+      messages: [
+        {
+          type: `text`,
+          text: "เลือกใช้งาน action ด้านล่างได้เลยครับ",
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                action: {
+                  type: "uri",
+                  label: "URI",
+                  uri: "https://developers.line.biz",
+                },
+              },
+              {
+                type: "action",
+                action: {
+                  type: "cameraRoll",
+                  label: "Camera Roll",
+                },
+              },
+              {
+                type: "action",
+                action: {
+                  type: "camera",
+                  label: "Camera",
+                },
+              },
+              {
+                type: "action",
+                action: {
+                  type: "location",
+                  label: "Location",
+                },
+              },
+              {
+                type: "action",
+                imageUrl:
+                  "https://cdn1.iconfinder.com/data/icons/mix-color-3/502/Untitled-1-512.png",
+                action: {
+                  type: "message",
+                  label: "Message",
+                  text: "Hello World!",
+                },
+              },
+              {
+                type: "action",
+                action: {
+                  type: "postback",
+                  label: "Postback",
+                  data: "action=buy&itemid=123",
+                  displayText: "Buy",
+                },
+              },
+              {
+                type: "action",
+                imageUrl:
+                  "https://icla.org/wp-content/uploads/2018/02/blue-calendar-icon.png",
+                action: {
+                  type: "datetimepicker",
+                  label: "Datetime Picker",
+                  data: "storeId=12345",
+                  mode: "datetime",
+                  initial: "2018-08-10t00:00",
+                  max: "2018-12-31t23:59",
+                  min: "2018-08-01t00:00",
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  });
+};
 
-// const reply = (bodyResponse) => {
-//   return request({
-//     method: `POST`,
-//     uri: `${LINE_MESSAGING_API}/reply`,
-//     headers: LINE_HEADER,
-//     body: JSON.stringify({
-//       replyToken: bodyResponse.events[0].replyToken,
-//       messages: [
-//         {
-//           type: `text`,
-//           text: bodyResponse.events[0].message.text,
-//         },
-//         {
-//           type: "text", // ①
-//           text: "Select your favorite food category or send me your location!",
-//           quickReply: {
-//             // ②
-//             items: [
-//               {
-//                 type: "action", // ③
-//                 imageUrl: "https://example.com/sushi.png",
-//                 action: {
-//                   type: "message",
-//                   label: "Sushi",
-//                   text: "Sushi",
-//                 },
-//               },
-//               {
-//                 type: "action",
-//                 imageUrl: "https://example.com/tempura.png",
-//                 action: {
-//                   type: "message",
-//                   label: "Tempura",
-//                   text: "Tempura",
-//                 },
-//               },
-//               {
-//                 type: "action", // ④
-//                 action: {
-//                   type: "location",
-//                   label: "Send location",
-//                 },
-//               },
-//             ],
-//           },
-//         },
-//       ],
-//     }),
-//   });
-// };
+const replyWithQuickReplyHoroscope = async (replyToken) => {
+  return request({
+    method: `POST`,
+    uri: `${LINE_MESSAGING_API}/reply`,
+    headers: LINE_HEADER,
+    body: JSON.stringify({
+      replyToken: replyToken,
+      messages: [
+        {
+          type: `text`,
+          text: "เลือกแมวที่คุณชอบด้านล่าง เพื่อบ่งบอกตัวตนคุณ",
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                imageUrl:
+                  "https://media.discordapp.net/attachments/1125648829862137916/1136968606664622121/1.png",
+                action: {
+                  type: "uri",
+                  label: "แมวสีส้ม สุดน่ารัก",
+                  uri: "https://media.discordapp.net/attachments/1125648829862137916/1136968607662886932/4.png",
+                },
+              },
+              {
+                type: "action",
+                imageUrl:
+                  "https://media.discordapp.net/attachments/1125648829862137916/1136968606970814554/2.png",
+                action: {
+                  type: "uri",
+                  label: "แมวสีครีม แสนสดใส",
+                  uri: "https://media.discordapp.net/attachments/1125648829862137916/1136968607948087326/5.png",
+                },
+              },
+              {
+                type: "action",
+                imageUrl:
+                  "https://media.discordapp.net/attachments/1125648829862137916/1136968607356682351/3.png",
+                action: {
+                  type: "uri",
+                  label: "แมวสีขาว ทรงเสน่ห์",
+                  uri: "https://media.discordapp.net/attachments/1125648829862137916/1136968608665305168/6.png",
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  });
+};
