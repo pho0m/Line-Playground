@@ -165,14 +165,6 @@ const replyWeatherSelectLocation = async (replyToken) => {
 };
 
 const getWeather = async (replyToken, messageData) => {
-  console.log("==================================");
-  console.log(messageData);
-  console.log("==================================");
-  console.log(messageData.latitude);
-
-  // const msgData = JSON.parse(messageData);
-  // console.log(msgData);
-
   const response = await request({
     method: `GET`,
     headers: {
